@@ -1,0 +1,22 @@
+wrangler.jsonc
+  s_db23f5f91d2079::t_fbd3dddd476204 23-26
+src/index.ts
+  s_db23f5f91d2079::t_cf30ee1e6e5d91 243-245,248
+  s_db23f5f91d2079::t_44bfce72040259 14-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "bae912c2b9e00d1b17958de76a3af99f301d5268",
+  "prompts": {},
+  "sessions": {
+    "s_db23f5f91d2079": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fc958599-bf04-4fc9-a8be-c4df15ff3836",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Shivam Bansal <shivambansal.in30@gmail.com>"
+    }
+  }
+}
