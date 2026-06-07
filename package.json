@@ -1,0 +1,32 @@
+{
+  "name": "cloudflare-proxy-worker",
+  "version": "1.0.0",
+  "description": "A transparent 1:1 HTTP proxy on Cloudflare Workers, built with TypeScript + Hono. Tooling powered by Bun.",
+  "module": "src/index.ts",
+  "main": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "start": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "cf-typegen": "wrangler types",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "hono": "^4.12.23"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.5.40",
+    "@cloudflare/workers-types": "^4.20260607.1",
+    "@types/bun": "latest",
+    "@vitest/runner": "2.1.8",
+    "@vitest/snapshot": "2.1.8",
+    "vitest": "2.1.8",
+    "wrangler": "^4.98.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
