@@ -20,6 +20,9 @@
     // "true" to follow upstream redirects, "false" for strict 1:1 passthrough of 3xx.
     "FOLLOW_REDIRECTS": "false",
     // "true" to attach permissive CORS headers so browsers can call the proxy.
-    "ENABLE_CORS": "true"
+    "ENABLE_CORS": "true",
+    // "false" disables the anti-bot bypass (browser headers + DDoS-Guard cookie replay).
+    // Only affects 429/403 challenge responses; successful responses stay verbatim.
+    "BYPASS_CHALLENGES": "true"
   }
 }

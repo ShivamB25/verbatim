@@ -11,6 +11,8 @@ type Bindings = {
   FOLLOW_REDIRECTS?: string
   /** "true" to attach permissive CORS headers for browser clients. */
   ENABLE_CORS?: string
+  /** "false" to disable the anti-bot bypass (browser headers + DDoS-Guard cookie replay). */
+  BYPASS_CHALLENGES?: string
 }
 
 /**
@@ -99,6 +101,82 @@ function buildForwardHeaders(incoming: Headers): Headers {
   return out
 }
 
+/**
+ * Realistic Chrome headers. Some origins behind anti-bot shields (e.g. DDoS-Guard,
+ * which fronts nyaa.si) reject requests lacking a browser fingerprint. We only fill
+ * fields the client didn't already send, so genuine client headers always win.
+ */
+const BROWSER_HEADERS: Record<string, string> = {
+  'user-agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  accept:
+    'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'accept-language': 'en-US,en;q=0.9',
+  'sec-ch-ua': '"Chromium";v="124", "Not:A-Brand";v="24", "Google Chrome";v="124"',
+  'sec-ch-ua-mobile': '?0',
+  'sec-ch-ua-platform': '"Windows"',
+  'sec-fetch-dest': 'document',
+  'sec-fetch-mode': 'navigate',
+  'sec-fetch-site': 'none',
+  'sec-fetch-user': '?1',
+  'upgrade-insecure-requests': '1',
+}
+
+/** Return a copy of `headers` with any missing browser-fingerprint fields filled in. */
+function withBrowserDefaults(headers: Headers): Headers {
+  const out = new Headers(headers)
+  for (const [key, value] of Object.entries(BROWSER_HEADERS)) {
+    if (!out.has(key)) out.set(key, value)
+  }
+  return out
+}
+
+/** Extract `__ddg*` (DDoS-Guard) cookies from a response's Set-Cookie headers, as a Cookie string. */
+function ddgCookiesFrom(res: Response): string | null {
+  const lines = res.headers.getSetCookie?.() ?? []
+  const pairs: string[] = []
+  for (const line of lines) {
+    const nameValue = line.split(';')[0]?.trim()
+    if (nameValue && /^__ddg/i.test(nameValue)) pairs.push(nameValue)
+  }
+  return pairs.length > 0 ? pairs.join('; ') : null
+}
+
+/**
+ * Fetch the upstream. With `bypass` enabled (default), fill browser headers and, if the
+ * origin answers 429/403 while handing back DDoS-Guard `__ddg` cookies, replay those
+ * cookies once. This only alters BLOCKED responses; any 2xx/3xx passes through verbatim.
+ * Retry is GET/HEAD-only because a streamed request body cannot be replayed.
+ */
+async function fetchUpstream(
+  target: string,
+  init: RequestInit,
+  bypass: boolean,
+  retryable: boolean,
+): Promise<Response> {
+  const baseHeaders = init.headers as Headers
+  const headers = bypass ? withBrowserDefaults(baseHeaders) : baseHeaders
+  const res = await fetch(target, { ...init, headers })
+
+  if (!bypass || !retryable) return res
+  if (res.status !== 429 && res.status !== 403) return res
+
+  const ddg = ddgCookiesFrom(res)
+  if (!ddg) return res
+
+  const retryHeaders = withBrowserDefaults(baseHeaders)
+  const existingCookie = retryHeaders.get('cookie')
+  retryHeaders.set('cookie', existingCookie ? `${existingCookie}; ${ddg}` : ddg)
+
+  // Discard the challenge body before retrying.
+  try {
+    await res.body?.cancel()
+  } catch {
+    /* already consumed */
+  }
+  return fetch(target, { ...init, headers: retryHeaders })
+}
+
 /** Build the response headers returned to the client: strip hop-by-hop, preserve the rest. */
 function buildResponseHeaders(upstream: Headers, enableCors: boolean): Headers {
   const out = new Headers()
@@ -162,9 +240,12 @@ app.all('*', async (c) => {
     redirect: followRedirects ? 'follow' : 'manual',
   }
 
+  // Default-on anti-bot bypass: only changes behaviour on 429/403 challenge responses.
+  const bypassChallenges = c.env.BYPASS_CHALLENGES !== 'false'
+
   let upstream: Response
   try {
-    upstream = await fetch(target.toString(), init)
+    upstream = await fetchUpstream(target.toString(), init, bypassChallenges, !hasBody)
   } catch (err) {
     return c.json(
       {
