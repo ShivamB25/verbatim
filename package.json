@@ -1,7 +1,7 @@
 {
-  "name": "cloudflare-proxy-worker",
+  "name": "verbatim",
   "version": "1.0.0",
-  "description": "A transparent 1:1 HTTP proxy on Cloudflare Workers, built with TypeScript + Hono. Tooling powered by Bun.",
+  "description": "Verbatim — a transparent 1:1 HTTP proxy on Cloudflare Workers, built with TypeScript + Hono. Tooling powered by Bun.",
   "module": "src/index.ts",
   "main": "src/index.ts",
   "type": "module",
